@@ -1,0 +1,37 @@
+- players state
+    - players name
+    - has guessed
+    - player id
+    - current score // score in current round
+    - total score   // score till last round
+    - state     // connected/disconnected
+
+- current messages
+    - message
+    - order // to sort msg to display in order
+
+- current game state
+    - board state   // drwaing board
+    - current clock time remaining in seconds
+    - timeout seconds
+    - rounds
+    - current round
+    - current word
+    - hint count    // max 2
+    - type  // private/public
+    - number of players in game   // for quick access and limit check
+    - max players
+    - state // gameover, started, pending
+
+
+
+
+
+- S3/noSQL/onServer
+    - room_id
+        - players
+            - array of players with attributes in player state
+        - messages
+            - array of messages with attributes in current messages
+        - game
+            - object of current game state
