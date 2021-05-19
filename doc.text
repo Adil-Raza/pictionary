@@ -22,6 +22,7 @@
     - number of players in game   // for quick access and limit check
     - max players
     - state // gameover, started, pending
+      - PENDING when game started and users will be redirected to game page
 
 
 
@@ -35,3 +36,22 @@
             - array of messages with attributes in current messages
         - game
             - object of current game state
+
+
+
+-------------------------------------------
+socket messages
+
+- createPvtRoom   // to create private room
+- pvtRoomCreated  // success msg for creation of private room, in here client will get the room id
+- connectToRoom  // after getting into room page, trigger this to connect to room
+- connectedToRoom // server acks if you have successfully connected to room
+- playerDisconected // when someone disconnects
+- playerJoined  // when someone disconnects
+- adminChange // admin change if admin disconnects
+- roundsChange // user changes round
+- roundsChangeBrod // inform other users of round change
+- timeoutSetChange  // user changes draw time
+- timeoutSetChangeBrod  // infor other users of draw time change
+- startGame // start game
+- gameStarted   // server ack for startGame
