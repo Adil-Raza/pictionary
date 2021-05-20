@@ -1,15 +1,21 @@
 <template>
   <div>
     <span v-if="gameStarted">
-      <b-row class="my-1">
-        <b-col>
-          <div class="card" style="box-shadow: rgb(39 37 37 / 60%) 1px 2px; background-color: black; width: 850px; left: 50%; transform: translate(-50%, 0%);">
-            <div class="card-body">
-              <b-row class="my-3">
+      <b-row class="my-1" align-h="center">
+        <b-col cols="10">
+          <div class="card" style="box-shadow: rgb(39 37 37 / 60%) 1px 2px; background-color: black;">
+            <div class="card-body" style="padding: 0px;">
+              <b-row class="mt-3">
+                <b-col style="text-align:left; color: #ababab; margin-top: 20px; padding-left: 150px">
+                  <h4>Round {{game.currentRound}} / {{game.rounds}}</h4>
+                </b-col>
                 <b-col>
                   <h3 class="card-title" style="color: aliceblue;">
                     💣😾  𝐏เᑕ𝕋ⓘｏηคгу  💜👊
                   </h3>
+                </b-col>
+                <b-col style="text-align:right; color: #ababab; margin-top: 20px; padding-right: 150px">
+                  <h4>Time left {{game.timeoutSec}} sec</h4>
                 </b-col>
               </b-row>
             </div>
@@ -20,31 +26,59 @@
         <b-col cols="2" class="">
           <div class="card text-center" style="box-shadow: rgb(39 37 37 / 60%) 1px 2px; background-color: black;" >
             <ul class="list-group list-group-flush" >
-              <li v-for="(user, index) in users" :key="index" class="list-group-item d-flex justify-content-between align-items-start" style="color: white; background-color: black;">
+              <li v-for="(user, index) in users" :key="index" class="list-group-item d-flex justify-content-between align-items-start" :style="`color: white; background-color: ${user.hasGuessed ? '#3e6346' : 'black'};`">
                 <div class="ms-2 me-auto">
                   <div class="fw-bold">{{user.name}}</div>
-                  Score:
+                  Score: {{user.score}}
                 </div>
                 <span class=" bg-light rounded-pill" style="font-size: xx-large;">{{getUserEmojiToDisplay(user.emoji)}}</span>
               </li>
             </ul>
           </div>
         </b-col>
-        <b-col cols="8">
-          <div class="card" style="box-shadow: rgb(39 37 37 / 60%) 1px 2px; background-color: #000000c4; width: 850px; left: 50%; transform: translate(-59.5%, 0%);" >
+        <b-col cols="6">
+          <div class="card" style="box-shadow: rgb(39 37 37 / 60%) 1px 2px; background-color: #000000c4; " >
             <div class="card-body">
               <b-row>
                 <b-col>
-                  <canvas class="board" id="myCanvas" :width="canvasSize.width" :height="canvasSize.height" @mousemove="draw" @mousedown="beginDrawing" @mouseup="stopDrawing"  />
+                  <div v-if="doOverlayCanvas()" class="overlay" :style="`height: ${canvasSize.height + 45}px; width: ${canvasSize.width + 45}px`">
+                    <span v-if="game.state === 'CHOOSING'">
+                      <span v-if="isMeSelectingWord()">
+                        <h2 style="color: white">Select your word</h2> <br />
+                        <button v-for="(word, index) in game.words" :key="index" class="btn btn-primary" @click="wordSelected(word)">{{word}}</button>
+                      </span>
+                      <span v-else>
+                        <h2 style="color: white">{{getUser(game.whoChoosing).name}} is selecting a word</h2>
+                      </span>
+                    </span>
+                    <span v-else-if="game.state === 'ROUNDEND'">
+                      <h2 style="color: white"> Round {{game.currentRound}} ended.</h2> <br />
+                    </span>
+                    <span v-else-if="game.state === 'TIMEOUT'">
+                      <h2 style="color: white"> TIMEOUT </h2> <br />
+                    </span>
+                  </div>
+                  <canvas class="board" id="myCanvas" :width="canvasSize.width" :height="canvasSize.height" @mousemove="draw" @mousedown="beginDrawing" @mouseup="stopDrawing" @mouseleave="stopDrawing">
+                  </canvas>
                 </b-col>
               </b-row>
             </div>
           </div>
         </b-col>
+        <b-col cols="2" class="">
+          <div class="card text-center" style="box-shadow: rgb(39 37 37 / 60%) 1px 2px; background-color: black; height: 600px; color: white; text-align: left; padding: 5px; overflow: auto" >
+            <div v-for="(message, index) in messages" :key="index" style="border-bottom: 1px solid #a29f9fad; text-align: left">
+              {{message.from}}: {{message.message}}
+            </div>
+          </div>
+          <div class="card text-center" style="box-shadow: rgb(39 37 37 / 60%) 1px 2px; background-color: black;">
+            <input v-model="myMessage" type="text" class="form-control" id="message" placeholder="Enter your guess." @keydown.enter="sendMyMessage()">
+          </div>
+        </b-col>
       </b-row>
-      <b-row>
-        <b-col>
-          <div class="card" style="box-shadow: rgb(39 37 37 / 60%) 1px 2px; background-color: #000000c4; width: 850px; left: 50%; transform: translate(-50%, 0%);">
+      <b-row align-h="center" v-if="isMeDrawing()">
+        <b-col cols="6">
+          <div class="card" style="box-shadow: rgb(39 37 37 / 60%) 1px 2px; background-color: #000000c4; ">
             <div class="card-body" style="padding: 5px">
                 <div class="row ">
                   <div class="col-2" style="color: white; padding-top: 7px;">
@@ -224,8 +258,6 @@ export default {
   },
   methods: {
     penSizeChange(index) {
-      console.log('chagne' ,index);
-      console.log(this.penSizeList[index]);
       this.penSizeIndex = index;
     },
     getSocketFromStore() {
@@ -252,23 +284,31 @@ export default {
       this.socket.on('roundsChangeBrod', this.handleRoundsChangeBrod)
       this.socket.on('timeoutSetChangeBrod', this.handleTimeoutSetChangeBrod)
       this.socket.on('gameStarted', this.handleGameStarted)
+      this.socket.on('boardChangeBrod', this.handleBoardChangeBrod)
+      this.socket.on('chatBrod', this.handleChatBrod)
+      this.socket.on('gameRoundBrod', this.handleGameRoundBrod)
+      this.socket.on('wordSelectedBrod', this.handleWordSelectedBrod)
+      this.socket.on('lobbyEndBrod', this.handleLobbyEndBrod)
+
+
     },
     handleConnectedToRoom(response) {
-      console.log(response)
-
       if(response.success) {
         this.users = [...response.players];
+        if(response.game) {
+          this.gameStarted = true;
+          this.game = response.game;
+          setTimeout(() => this.initialiseCanvas(), 1000)
+        }
         this.connectedToRoom = true;
       } else {
        //  toaster to show room does not exists
       }
     },
     handlePlayerDisconected(player) {
-      console.log('player disconnected', player);
       this.users = this.users.filter(user => user.id !== player.id);
     },
     handlePlayerJoined(player) {
-      console.log('player joined', player)
       this.users = [...this.users, player]
     },
     handleAdminChange(player) {
@@ -289,6 +329,62 @@ export default {
       this.gameStarted = true;
       this.game = game;
       setTimeout(() => this.initialiseCanvas(), 1000)
+    },
+    handleBoardChangeBrod(data) {
+      // apply the change to canvas
+      let boardState = data.boardState;
+
+      if(boardState && boardState != null) {
+        let image = new Image();
+
+        image.onload = () => {
+          this.canvas.drawImage(image, 0, 0);
+        }
+
+        image.src = boardState;
+      }
+    },
+    handleChatBrod(data) {
+      console.log(data, this.myMessage);
+      if(data) {
+        let user = this.users.filter(user => user.id == data.id)[0];
+
+        this.messages.push({
+          from: user.name,
+          message: data.msg
+        })
+
+        this.myMessage = '';
+      }
+    },
+    handleGameRoundBrod(data) {
+      this.game.state = data.state;
+      this.game.currentRound = data.currentRound;
+      this.game.whoChoosing = data.whoChoosing;
+
+      let user = this.users.filter(user => user.id === this.game.whoChoosing)[0];
+
+      if(user.self) {
+        // if i am choosing the word, then set the words that i need to choose from
+        this.game.words = data.words;
+      }
+    },
+    handleWordSelectedBrod(data) {
+      this.game.state = data.state;
+      this.game.currentRound = data.currentRound;
+      this.game.whoDrawing = data.whoDrawing
+
+      this.timerInterval = setInterval(() => {
+        this.game.timeoutSec -= 1;
+        if(this.game.timeoutSec <= 0){
+          clearInterval(this.timerInterval);
+        }
+      }, 1000);
+    },
+    handleLobbyEndBrod(data) {
+      this.game.state = data.game.state;
+
+      // TODO: after server sends player new score set them and show
     },
     connectToRoom(roomId) {
       this.socket.emit('connectToRoom', { roomId, user: this.getUserFromStore() });
@@ -340,28 +436,42 @@ export default {
       return false;
     },
     drawTimeChange() {
-      console.log(this.timeoutSec)
       this.socket.emit('timeoutSetChange', {timeoutSec: this.timeoutSec});
     },
     roundsChange() {
-      console.log(this.rounds)
       this.socket.emit('roundsChange', {rounds: this.rounds});
     },
     initialiseCanvas() {
+      console.log(this.game);
       let c = document.getElementById('myCanvas');
+      this.canvasElement = c;
       this.canvas = c.getContext('2d');
       this.canvas.fillStyle = '#ffffff';
       this.canvas.fillRect(0, 0, this.canvasSize.width, this.canvasSize.height);
+
+      this.handleBoardChangeBrod({boardState: this.game.boardState});
+    },
+    sendCanvasToServer() {
+      let boardState = this.canvasElement.toDataURL('image/png');
+
+      this.socket.emit('boardChange', {
+        boardState: boardState
+      });
     },
     showCoordinates(e) {
       this.x = e.offsetX;
       this.y = e.offsetY;
     },
     drawLine(x1, y1, x2, y2, color) {
+      if(!this.isMeDrawing()) return;
+
+      console.log([x1,y1, x2, y2]);
       let ctx = this.canvas;
       ctx.beginPath();
       ctx.strokeStyle = color;  //this.colorSelected ? this.colorSelected : 'black';
       ctx.lineWidth = this.penSizeIndex ? this.penSizeList[this.penSizeIndex].size : 1;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
       ctx.stroke();
@@ -383,6 +493,11 @@ export default {
         this.x = e.offsetX;
         this.y = e.offsetY;
         this.isDrawing = true;
+
+        this.boardSendingInterval = setInterval(() => {
+
+          this.sendCanvasToServer();
+        }, 500);
       } else if(this.canvasSelectedTool === 'FILL') {
         this.fillColor(this.colorSelected);
       }
@@ -397,19 +512,69 @@ export default {
         this.x = 0;
         this.y = 0;
         this.isDrawing = false;
+
+        if(this.boardSendingInterval){
+          clearInterval(this.boardSendingInterval);
+        }
+        this.sendCanvasToServer();
       }
     },
     clearCanvas() {
-      console.log('clearing')
       this.canvas.clearRect(0, 0, this.canvasSize.width, this.canvasSize.height);
+
+      this.sendCanvasToServer();
     },
     fillColor(color) {
-      console.log('filling', color);
       this.canvas.fillStyle = color;
       this.canvas.fillRect(0, 0, this.canvasSize.width, this.canvasSize.height);
+
+      this.sendCanvasToServer();
     },
     changeCanvasSelectedTool(tool) {
       this.canvasSelectedTool = tool;
+    },
+    sendMyMessage() {
+      this.socket.emit('chat', this.myMessage);
+    },
+    doOverlayCanvas() {
+      if(['PENDING', 'CHOOSING', 'ROUNDEND', 'TIMEOUT'].includes(this.game.state)) {
+        return true;
+      }
+
+      return false;
+    },
+    wordSelected(word) {
+      this.socket.emit('wordSelected', word);
+    },
+    isMeSelectingWord() {
+      if(this.game.whoChoosing) {
+        let user = this.users.filter(user => user.id === this.game.whoChoosing)[0];
+
+        if(user.self) {
+          // if i am choosing the word
+          return true;
+        }
+      }
+
+      return false;
+    },
+    isMeDrawing() {
+      // TODO: restrict draw from server too
+      if(this.game.whoDrawing) {
+        let user = this.users.filter(user => user.id === this.game.whoDrawing)[0];
+
+        if(user.self) {
+          // if i am drawing the word
+          return true;
+        }
+      }
+
+      return false;
+    },
+    getUser(userId) {
+      let user = this.users.filter(user => user.id === userId)[0];
+
+      return user
     }
   },
   data() {
@@ -420,20 +585,22 @@ export default {
       name: '',
       roundsList: [2, 3, 4, 5, 6, 7, 8, 9, 10],
       rounds: 2,
-      timeoutSecList: [60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180],
+      timeoutSecList: [10, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180],
       timeoutSec: 90,
       emojis: ['🐣', '😾', '👺', '🐻', '😡', '🐤', '🐼', '😳', '🐑', '👽', '🐰', '💀', '🎃', '🐙', '😲', '😂', '😍', '🥳', '🥵', '🤡','💩', '😭', '🤪', '🥺', '😘'],
       currentEmojiIndex: 0,
       gameStarted: false,
       game: undefined,
       canvas: null,
+      canvasElement: null,
       canvasSize: {
-        width: 800,
+        width: 900,
         height: 600
       },
       x:0,
       y:0,
       isDrawing: false,
+      boardSendingInterval: undefined,
       colorSelected: '#000000',
       penLineWidth: 1,
       penSizeList: [
@@ -466,19 +633,39 @@ export default {
       ],
       penSizeIndex: 0,
       canvasSelectedTool: 'PEN',  // PEN, ERASER, FILL
+      messages:[],
+      myMessage: '',
+      timerInterval: undefined
     }
   },
 }
 </script>
 
-<style scoped>
+<style scoped lang="scss">
   .board {
     background-color: white;
-    box-shadow: rgb(134 129 129 / 72%) 2px 3px;
+    box-shadow: rgb(39 37 37 / 60%) 1px 2px;
   }
 
   .sketch {
     width: 50rem;
     height: 40rem;
   }
+
+  .overlay {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: absolute;
+    z-index: 2;
+    opacity: 0;
+    background: rgba(39, 42, 43, 0.8);
+    transition: opacity 200ms ease-in-out;
+    border-radius: 4px;
+    margin: -15px 0 0 -15px;
+    button {
+      margin:5px;
+    }
+    opacity: 1;
+}
 </style>

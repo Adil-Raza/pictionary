@@ -23,6 +23,10 @@
     - max players
     - state // gameover, started, pending
       - PENDING when game started and users will be redirected to game page
+      - CHOOSING  when a player is choosing a word
+      - GUESSING   when players are guessing the word and drawer is drawing
+      - TIMEOUT  when timeout has occored or all player guessed
+      - ROUNDEND when round has ended
 
 
 
@@ -55,3 +59,53 @@ socket messages
 - timeoutSetChangeBrod  // infor other users of draw time change
 - startGame // start game
 - gameStarted   // server ack for startGame
+- boardChange  // when there is change in canvas
+- boardChangeBrod // broadcasting the change in canvas
+- chat  // to send msg
+- chatBrod  // server brodcasting msgs
+- gameRoundBrod // server sending the current round when it that round starts
+- wordSelected  // when user selected a word
+- wordSelectedBrod // server broadcasting that word is choosen so game starts
+- lobbyEndBrod  // when timeout has occored or all player guessed
+
+
+
+WebSocket?token=03AGdBq26TnvyGGPNAsr4qLy7SsMA9YBPB_Vx9yjgA6…IO=3&transport=websocket&sid=eK8kc3DpdSRdkrz3AVar
+2 / 124 requests
+0 B / 3.8 MB transferred
+0 B / 5.0 MB resources
+
+
+All
+Data
+Length
+Time
+2probe	6
+00:35:03.677
+3probe	6
+00:35:03.839
+5	1
+00:35:03.945
+42["lobbyPlayerConnected",{"id":1,"name":"Charlie Chaplin","avatar":[17,6,0,-1],"score":0,"guessedWord":false}]	111
+00:35:23.567
+2	1
+00:35:28.163
+3	1
+00:35:28.330
+2	1
+00:35:53.331
+3	1
+00:35:53.496
+42["lobbyGameStart",""]	23
+00:35:54.820
+42["lobbyGameStart"]	20
+00:35:54.982
+42["lobbyRound",0]	18
+00:35:55.044
+42["lobbyChooseWord",{"id":1}]	30
+00:35:57.661
+42["lobbyPlayerDrawing",1]	26
+00:36:13.652
+42["lobbyCurrentWord","________"]	33
+00:36:13.662
+42["canvasClear"]
