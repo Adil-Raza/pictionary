@@ -28,7 +28,12 @@ const {
 
 let rooms = {};
 
-let socketIdToRoomId = {}
+let socketIdToRoomId = {};
+
+const DRWAINGPLAYERSCORE = 30;
+const FIRSTRANKSCORE = 400;
+const SECONDRANKSCORE = 300;
+const SUBSEQUENTSCOREDROP = 25;
 
 const wordList = ['train', 'haircut', 'strange', 'sweet', 'deliver', 'cart', 'agony','vigorous', 'secure', 'mountain', 'prospect'];
 
@@ -61,7 +66,10 @@ io.on('connection', (socket) => {
     };
 
     rooms[roomId] = {
-      players: [player]
+      players: [player],
+      game: {
+        state: 'ROOM'
+      }
     }
 
     socketIdToRoomId[socket.id] = roomId;
@@ -133,14 +141,13 @@ io.on('connection', (socket) => {
         emoji: playerInfo.emoji,
         score: playerInfo.score,
         hasGuessed: playerInfo.hasGuessed,
-        isAdmin: playerInfo.isAdmin,
-        self: (socket.id === playerInfo.socket.id ? true : false)
+        isAdmin: playerInfo.isAdmin
       }
       response.players = players;
 
       // check if game has started, if yes, send the game object also so that it will redirect directly to game screen
-      console.log('player joined', roomId, rooms[roomId].game);
-      if(rooms[roomId].game) {
+      // console.log('player joined', roomId, rooms[roomId].game);
+      if(rooms[roomId].game.state != 'ROOM') {
         // change the response to send only nessesary info
         response.game = rooms[roomId].game;
       }
@@ -229,54 +236,7 @@ io.on('connection', (socket) => {
         })
 
         // start round 1, and brod to every player
-
         startRound(roomId, 1);
-
-        rooms[roomId].game.currentRound = 1;
-        rooms[roomId].game.state = 'CHOOSING';
-
-        // choosing a plyaer in sequence who will choose a word, and who is connected and has not choosen a word till now
-        let whoChoosing = -1;
-        for(let i = 0; i < rooms[roomId].players.length; i+=1) {
-          if(rooms[roomId].players[i].connectedToRoom && !rooms[roomId].game.whoHasAlreadyChoosen.includes(rooms[roomId].players[i].id)) {
-            whoChoosing = rooms[roomId].players[i].id;
-            break;
-          }
-        }
-
-        if(whoChoosing != -1) {
-          rooms[roomId].game.whoChoosing = whoChoosing;
-
-          // randomly selecting 3 word for user to select
-          let words = _.sampleSize(wordList, 3);
-
-          let response = {
-            currentRound: rooms[roomId].game.currentRound,
-            state: rooms[roomId].game.state,
-            whoChoosing: rooms[roomId].game.whoChoosing  // player id who is choosing the word
-          }
-          rooms[roomId].players.forEach(player => {
-            if(player.id === rooms[roomId].game.whoChoosing) {
-              // append 3 words to player who is choosing word
-              response.words = words;
-            }
-
-            player.socket.emit('gameRoundBrod', response);
-          })
-        } else {
-          rooms[roomId].game.whoChoosing = -1;
-          // brod round end, as all the connected users have selected the word
-          rooms[roomId].game.state = 'ROUNDEND';
-
-          // TODO: send players new score ranking
-          response = {
-            game: { state: rooms[roomId].game.state }
-          }
-
-          rooms[roomId].players.forEach(player => {
-            player.socket.emit('lobbyEndBrod', response);
-          })
-        }
       }
     }
   })
@@ -295,84 +255,9 @@ io.on('connection', (socket) => {
 
         rooms[roomId].game.whoHasAlreadyChoosen.push(playerInfo[0].id);
         rooms[roomId].game.state = 'GUESSING';
-        rooms[roomId].game.whoChoosing = -1;
         rooms[roomId].game.whoDrawing = playerInfo[0].id;
 
-        rooms[roomId].game.timerInterval = setInterval(() => {
-          rooms[roomId].game.timeoutSec -= 1;
-          if(rooms[roomId].game.timeoutSec <= 0) {
-            clearInterval(rooms[roomId].game.timerInterval);
-            // TODO: check if all connected players have selected word then
-            let hasAllPlayersSelectedWord = true;
-
-            for(let i = 0; i < rooms[roomId].players.length; i += 1) {
-              if(rooms[roomId].players[i].connectedToRoom && !rooms[roomId].game.whoHasAlreadyChoosen.includes(rooms[roomId].players[i].id)) {
-                hasAllPlayersSelectedWord = false;
-              }
-            }
-
-            let response = {};
-
-            if(hasAllPlayersSelectedWord) {
-              rooms[roomId].game.state = 'ROUNDEND';
-
-              // TODO: send players new score ranking
-              response = {
-                game: { state: rooms[roomId].game.state }
-              }
-
-              rooms[roomId].players.forEach(player => {
-                player.socket.emit('lobbyEndBrod', response);
-              })
-            } else {
-              rooms[roomId].game.state = 'TIMEOUT';
-
-              // TODO: send players new score ranking
-              response = {
-                game: { state: rooms[roomId].game.state }
-              }
-
-              rooms[roomId].players.forEach(player => {
-                player.socket.emit('lobbyEndBrod', response);
-              })
-
-              setTimeout(() => {
-                // next player needs to select word
-                // choosing a plyaer in sequence who will choose a word, and who is connected and has not choosen a word till now
-                let whoChoosing = -1;
-                for(let i = 0; i < rooms[roomId].players.length; i+=1) {
-                  if(rooms[roomId].players[i].connectedToRoom && !rooms[roomId].game.whoHasAlreadyChoosen.includes(rooms[roomId].players[i].id)) {
-                    whoChoosing = rooms[roomId].players[i].id;
-                    break;
-                  }
-                }
-
-                if(whoChoosing != -1) {
-                  rooms[roomId].game.whoChoosing = whoChoosing;
-
-                  rooms[roomId].game.state = 'CHOOSING';
-
-                  // randomly selecting 3 word for user to select
-                  let words = _.sampleSize(wordList, 3);
-
-                  let response = {
-                    currentRound: rooms[roomId].game.currentRound,
-                    state: rooms[roomId].game.state,
-                    whoChoosing: rooms[roomId].game.whoChoosing  // player id who is choosing the word
-                  }
-                  rooms[roomId].players.forEach(player => {
-                    if(player.id === rooms[roomId].game.whoChoosing) {
-                      // append 3 words to player who is choosing word
-                      response.words = words;
-                    }
-
-                    player.socket.emit('gameRoundBrod', response);
-                  })
-                }
-              }, 5000);
-            }
-          }
-        }, 1000);
+        startClockTimer(roomId)
 
         let response = {
           currentRound: rooms[roomId].game.currentRound,
@@ -380,6 +265,7 @@ io.on('connection', (socket) => {
           whoDrawing: rooms[roomId].game.whoDrawing
         }
 
+        console.log('selecting word', rooms[roomId].game);
         // brodcast that word is choosen so the game starts
         rooms[roomId].players.forEach(player => {
           if(player.id === rooms[roomId].game.whoChoosing) {
@@ -392,6 +278,8 @@ io.on('connection', (socket) => {
 
           player.socket.emit('wordSelectedBrod', response);
         })
+
+        rooms[roomId].game.whoChoosing = -1;
       }
     }
   })
@@ -423,12 +311,59 @@ io.on('connection', (socket) => {
     if(roomId && rooms[roomId]) {
       const playerInfo = rooms[roomId].players.filter(player => player.socket.id == socket.id);
 
-      rooms[roomId].players.forEach(player => {
-        player.socket.emit('chatBrod', {
-          id: playerInfo[0].id,
-          msg: message
-        });
-      })
+      if(playerInfo[0].id != rooms[roomId].game.whoDrawing && !playerInfo[0].hasGuessed) {
+        if(didGuessMatch(roomId, message)) {
+          playerInfo[0].subRoundScore = getSubRoundScore(roomId);
+          playerInfo[0].hasGuessed = true;
+
+          addScoreToDrawingPlayer(roomId);
+
+          // brod that player this guessed
+          rooms[roomId].players.forEach(player => {
+            if(player.id !== playerInfo[0].id) {
+              player.socket.emit('playerGuessed', {
+                id: playerInfo[0].id
+              })
+            } else {
+              player.socket.emit('chatBrod', {
+                id: playerInfo[0].id,
+                msg: message,
+                color: '#3e6346'
+              });
+            }
+          })
+        } else {
+          rooms[roomId].players.forEach(player => {
+            player.socket.emit('chatBrod', {
+              id: playerInfo[0].id,
+              msg: message
+            });
+          })
+        }
+      } else {
+        // brod to only players those have guessed, and send msg with green color
+        rooms[roomId].players.forEach(player => {
+          (player.hasGuessed || player.id === rooms[roomId].game.whoDrawing) &&
+          player.socket.emit('chatBrod', {
+            id: playerInfo[0].id,
+            msg: message,
+            color: '#3e6346'
+          });
+        })
+      }
+
+      printPlayers(roomId);
+
+      if(allPlayersGuessed(roomId)) {
+        clearInterval(rooms[roomId].game.timerInterval);
+        sendTimeOut(roomId);
+
+        setTimeout(() => {
+          // next player needs to select word if any left
+          refereshPlayer(roomId);
+          startWordSelection(roomId);
+        }, 5000);
+      }
     }
   })
 
@@ -445,7 +380,7 @@ io.on('connection', (socket) => {
         // broadcast to all players in roomId with playerid that is disconnected
         rooms[roomId].players.forEach(player => {
           if(socket.id !== player.socket.id && player.connectedToRoom){
-            console.log(`--broadcasting to ${player.id}`);
+            // console.log(`--broadcasting to ${player.id}`);
             player.socket.emit('playerDisconected', {
               id: playerInfo[0].id
             });
@@ -484,9 +419,226 @@ io.on('connection', (socket) => {
 })
 
 const startRound = (roomId, round) => {
-  console.log('round start from function')
+  rooms[roomId].game.currentRound = round;
+  rooms[roomId].game.whoChoosing = -1;
+  rooms[roomId].game.state.whoDrawing = -1;
+  rooms[roomId].game.whoHasAlreadyChoosen = [];
+
+  refereshPlayer(roomId);
+
+  startWordSelection(roomId);
 }
 
+const startWordSelection = (roomId) => {
+  refereshPlayer(roomId);
+
+  rooms[roomId].game.state = 'CHOOSING';
+  rooms[roomId].game.state.whoDrawing = -1;
+  rooms[roomId].game.whoChoosing = -1;
+
+  // choosing a plyaer in sequence who will choose a word, and who is connected and has not choosen a word till now
+  let whoChoosing = -1;
+  for(let i = 0; i < rooms[roomId].players.length; i+=1) {
+    if(rooms[roomId].players[i].connectedToRoom && !rooms[roomId].game.whoHasAlreadyChoosen.includes(rooms[roomId].players[i].id)) {
+      whoChoosing = rooms[roomId].players[i].id;
+      break;
+    }
+  }
+
+  if(whoChoosing != -1) {
+    rooms[roomId].game.whoChoosing = whoChoosing;
+
+    // randomly selecting 3 word for user to select
+    let words = _.sampleSize(wordList, 3);
+
+    let response = {
+      currentRound: rooms[roomId].game.currentRound,
+      state: rooms[roomId].game.state,
+      whoChoosing: rooms[roomId].game.whoChoosing  // player id who is choosing the word
+    }
+
+    rooms[roomId].players.forEach(player => {
+      if(player.id === rooms[roomId].game.whoChoosing) {
+        // append 3 words to player who is choosing word
+        response.words = words;
+      }
+
+      player.socket.emit('gameRoundBrod', response);
+    })
+  } else {
+    rooms[roomId].game.whoChoosing = -1;
+
+    sendRoundEnd(roomId);
+  }
+}
+
+const sendRoundEnd = (roomId) => {
+  // brod round end, as all the connected users have selected the word
+  rooms[roomId].game.state = 'ROUNDEND';
+
+  // TODO: send players new score ranking as round ended
+  let response = {
+    game: { state: rooms[roomId].game.state }
+  }
+
+  rooms[roomId].players.forEach(player => {
+    player.socket.emit('lobbyEndBrod', response);
+  })
+
+  setTimeout(() => {
+    if(rooms[roomId].game.currentRound < rooms[roomId].game.rounds) {
+      startRound(roomId, rooms[roomId].game.currentRound + 1);
+    } else {
+      console.log('game over');
+      sendGameEnd(roomId);
+    }
+  }, 5000)
+}
+
+const sendTimeOut = (roomId) => {
+  rooms[roomId].game.state = 'TIMEOUT';
+
+  let scores = getPlayersSubRoundScore(roomId);
+
+  let response = {
+    game: { state: rooms[roomId].game.state },
+    scores : scores,
+    word: rooms[roomId].game.currentWord
+  }
+
+  rooms[roomId].players.forEach(player => {
+    player.socket.emit('lobbyEndBrod', response);
+  })
+}
+
+const startClockTimer = (roomId) => {
+  rooms[roomId].game.timer = rooms[roomId].game.timeoutSec; // setting timer for counter;
+
+  rooms[roomId].game.timerInterval = setInterval(() => {
+    rooms[roomId].game.timer -= 1; // decreasing time every second
+
+    if(rooms[roomId].game.timer <= 0) {
+      clearInterval(rooms[roomId].game.timerInterval);
+
+      let hasAllPlayersSelectedWord = true;
+
+      for(let i = 0; i < rooms[roomId].players.length; i += 1) {
+        if(rooms[roomId].players[i].connectedToRoom && !rooms[roomId].game.whoHasAlreadyChoosen.includes(rooms[roomId].players[i].id)) {
+          hasAllPlayersSelectedWord = false;
+          break;
+        }
+      }
+
+      if(hasAllPlayersSelectedWord) {
+        sendRoundEnd(roomId);
+      } else {
+        sendTimeOut(roomId);
+        setTimeout(() => {
+          refereshPlayer(roomId);
+          // next player needs to select word if any left
+          startWordSelection(roomId);
+        }, 5000);
+      }
+    }
+  }, 1000);
+}
+
+const didGuessMatch = (roomId, message) => {
+  const currentWord = rooms[roomId].game.currentWord;
+
+  return currentWord.toLowerCase() === message.toLowerCase();
+}
+
+const allPlayersGuessed = (roomId) => {
+  let allGuessed = true;
+
+  rooms[roomId].players.forEach(player => {
+    if(player.id !== rooms[roomId].game.whoDrawing && !player.hasGuessed) {
+      allGuessed = false;
+    }
+  })
+
+  return allGuessed;
+}
+
+const refereshPlayer = (roomId) => {
+  rooms[roomId].players.forEach(player => {
+    player.score += (player.subRoundScore ? player.subRoundScore : 0);
+    player.hasGuessed = false;
+    player.subRoundScore = 0;
+  })
+
+  // brod to referesh the players
+  rooms[roomId].players.forEach(player => {
+    player.socket.emit('refereshPlayer', '');
+  })
+}
+
+const getPlayersSubRoundScore = (roomId) => {
+  let scores = {};
+
+  rooms[roomId].players.forEach(player => {
+    if(player.connectedToRoom) {
+      scores[player.id] = player.subRoundScore;
+    }
+  })
+
+  return scores;
+}
+
+const getSubRoundScore = (roomId) => {
+  let guessedIndex = 1;
+
+  rooms[roomId].players.forEach(player => {
+    if(player.id !== rooms[roomId].game.whoDrawing && player.hasGuessed) {
+      guessedIndex += 1;
+    }
+  })
+
+
+  console.log('guessedIndex: ', guessedIndex);
+
+  if(guessedIndex == 1){
+    return FIRSTRANKSCORE;
+  } else {
+    let score = (SECONDRANKSCORE - ((guessedIndex - 2) * SUBSEQUENTSCOREDROP));
+    return score < 100 ? 100 : score;
+  }
+}
+
+const addScoreToDrawingPlayer = (roomId) => {
+  const drawingPlayerId = rooms[roomId].game.whoDrawing;
+
+  rooms[roomId].players.forEach(player => {
+    if(player.id === drawingPlayerId) {
+      player.subRoundScore += DRWAINGPLAYERSCORE;
+    }
+  })
+}
+
+const sendGameEnd = (roomId) => {
+  rooms[roomId].game.state = 'GAMEEND';
+
+  rooms[roomId].players.forEach(player => {
+    if(player.connectedToRoom)
+      player.socket.emit('gameEnd');
+  })
+}
+
+
+
+const printPlayers = (roomId) => {
+  let players = [];
+
+  rooms[roomId].players.forEach((player) => {
+    players.push( {
+      id: player.id,
+      name: player.name,
+      hasGuessed: player.hasGuessed
+    })
+  })
+  console.log('players', players);
+}
 
 // let uers = [];
 

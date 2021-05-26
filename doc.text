@@ -22,11 +22,13 @@
     - number of players in game   // for quick access and limit check
     - max players
     - state // gameover, started, pending
+      - ROOM   when game is in room state
       - PENDING when game started and users will be redirected to game page
       - CHOOSING  when a player is choosing a word
       - GUESSING   when players are guessing the word and drawer is drawing
       - TIMEOUT  when timeout has occored or all player guessed
       - ROUNDEND when round has ended
+      - GAMEEND when game over
 
 
 
@@ -63,10 +65,13 @@ socket messages
 - boardChangeBrod // broadcasting the change in canvas
 - chat  // to send msg
 - chatBrod  // server brodcasting msgs
-- gameRoundBrod // server sending the current round when it that round starts
+- gameRoundBrod // server sending the current round when it that round starts and someone should select the word
 - wordSelected  // when user selected a word
 - wordSelectedBrod // server broadcasting that word is choosen so game starts
 - lobbyEndBrod  // when timeout has occored or all player guessed
+- playerGuessed // when some guesses the word
+- refereshPlayer  // when round starts and player data needs to be refereshed, like hasGuessed
+- gameEnd // when game ends
 
 
 

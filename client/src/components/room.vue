@@ -15,7 +15,7 @@
                   </h3>
                 </b-col>
                 <b-col style="text-align:right; color: #ababab; margin-top: 20px; padding-right: 150px">
-                  <h4>Time left {{game.timeoutSec}} sec</h4>
+                  <h4>Time left {{timer}} sec</h4>
                 </b-col>
               </b-row>
             </div>
@@ -55,7 +55,20 @@
                       <h2 style="color: white"> Round {{game.currentRound}} ended.</h2> <br />
                     </span>
                     <span v-else-if="game.state === 'TIMEOUT'">
-                      <h2 style="color: white"> TIMEOUT </h2> <br />
+                      <h2 style="color: white"> The Word Was: {{word}} </h2> <br />
+                      <span v-for="(user, index) in users" :key="index" style="color: white">
+                        <h3>{{user.name}}: <span :style="`color: ${getUserSubRoundScore(user.id) == 0 ? 'red' : 'green'}`"> +{{getUserSubRoundScore(user.id)}}</span></h3><br />
+                      </span>
+                    </span>
+                    <span v-else-if="game.state === 'GAMEEND'">
+                      <h2 style="color: white">Game End</h2> <br />
+                      <span v-for="(user, index) in getSortedUsers()" :key="index" style="color: white">
+                        <span>
+                          <span style="font-size: xxx-large;">{{getUserEmojiToDisplay(user.emoji)}}</span>
+                          #{{index + 1}} {{user.name}} {{user.self ? '(You)' : ''}}
+                        </span>
+                        <br v-if="(index + 1) % 2 == 0" />
+                      </span>
                     </span>
                   </div>
                   <canvas class="board" id="myCanvas" :width="canvasSize.width" :height="canvasSize.height" @mousemove="draw" @mousedown="beginDrawing" @mouseup="stopDrawing" @mouseleave="stopDrawing">
@@ -68,7 +81,7 @@
         <b-col cols="2" class="">
           <div class="card text-center" style="box-shadow: rgb(39 37 37 / 60%) 1px 2px; background-color: black; height: 600px; color: white; text-align: left; padding: 5px; overflow: auto" >
             <div v-for="(message, index) in messages" :key="index" style="border-bottom: 1px solid #a29f9fad; text-align: left">
-              {{message.from}}: {{message.message}}
+              <span :style="`color: ${message.color ? message.color : 'white'}`">{{message.from}}: {{message.message}}</span>
             </div>
           </div>
           <div class="card text-center" style="box-shadow: rgb(39 37 37 / 60%) 1px 2px; background-color: black;">
@@ -289,7 +302,9 @@ export default {
       this.socket.on('gameRoundBrod', this.handleGameRoundBrod)
       this.socket.on('wordSelectedBrod', this.handleWordSelectedBrod)
       this.socket.on('lobbyEndBrod', this.handleLobbyEndBrod)
-
+      this.socket.on('playerGuessed', this.handlePlayerGuessed)
+      this.socket.on('refereshPlayer', this.handleRefereshPlayer)
+      this.socket.on('gameEnd', this.handleGameEnd)
 
     },
     handleConnectedToRoom(response) {
@@ -349,10 +364,16 @@ export default {
       if(data) {
         let user = this.users.filter(user => user.id == data.id)[0];
 
-        this.messages.push({
+        let message = {
           from: user.name,
           message: data.msg
-        })
+        };
+
+        if(data.color) {
+          message.color = data.color;
+        }
+
+        this.messages.push(message)
 
         this.myMessage = '';
       }
@@ -372,19 +393,54 @@ export default {
     handleWordSelectedBrod(data) {
       this.game.state = data.state;
       this.game.currentRound = data.currentRound;
-      this.game.whoDrawing = data.whoDrawing
+      this.game.whoDrawing = data.whoDrawing;
+
+      this.timer = this.game.timeoutSec;
 
       this.timerInterval = setInterval(() => {
-        this.game.timeoutSec -= 1;
-        if(this.game.timeoutSec <= 0){
-          clearInterval(this.timerInterval);
-        }
+        this.timer -= 1;
       }, 1000);
     },
     handleLobbyEndBrod(data) {
+      this.timer = 0;
+      this.timerInterval && clearInterval(this.timerInterval);
       this.game.state = data.game.state;
 
-      // TODO: after server sends player new score set them and show
+      if(this.game.state === 'TIMEOUT') {
+         this.subRoundScores = data.scores;
+        this.word = data.word;
+
+        this.users.forEach(user => {
+          user.score += (data.scores[user.id] ? data.scores[user.id] : 0);
+        })
+      }
+    },
+    handlePlayerGuessed(data) {
+      const playerId = data.id;
+      let guessedUser = undefined;
+
+      this.users.forEach(user => {
+        if(user.id === playerId) {
+          guessedUser = user
+          user.hasGuessed = true;
+        }
+      })
+
+      this.messages.push({
+        from: guessedUser.name,
+        message: ' Has guessed',
+        color: '#3e6346'
+      })
+
+      this.myMessage = '';
+    },
+    handleRefereshPlayer() {
+      this.users.forEach(user => {
+        user.hasGuessed = false;
+      })
+    },
+    handleGameEnd() {
+      this.game.state = 'GAMEEND';
     },
     connectToRoom(roomId) {
       this.socket.emit('connectToRoom', { roomId, user: this.getUserFromStore() });
@@ -537,7 +593,7 @@ export default {
       this.socket.emit('chat', this.myMessage);
     },
     doOverlayCanvas() {
-      if(['PENDING', 'CHOOSING', 'ROUNDEND', 'TIMEOUT'].includes(this.game.state)) {
+      if(['PENDING', 'CHOOSING', 'ROUNDEND', 'TIMEOUT', 'GAMEEND'].includes(this.game.state)) {
         return true;
       }
 
@@ -575,6 +631,16 @@ export default {
       let user = this.users.filter(user => user.id === userId)[0];
 
       return user
+    },
+    getUserSubRoundScore(userId) {
+      return this.subRoundScores[userId] ? this.subRoundScores[userId] : 0;
+    },
+    getSortedUsers() {
+      let result = [...this.users];
+
+      result.sort((a, b) => (a.score > b.score) ? 1 : ((b.score > a.score) ? -1 : 0));
+
+      return result;
     }
   },
   data() {
@@ -583,7 +649,7 @@ export default {
       connectedToRoom: false,
       users: [],
       name: '',
-      roundsList: [2, 3, 4, 5, 6, 7, 8, 9, 10],
+      roundsList: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
       rounds: 2,
       timeoutSecList: [10, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180],
       timeoutSec: 90,
@@ -635,7 +701,10 @@ export default {
       canvasSelectedTool: 'PEN',  // PEN, ERASER, FILL
       messages:[],
       myMessage: '',
-      timerInterval: undefined
+      timerInterval: undefined,
+      timer : 0,
+      subRoundScores: {},
+      word: ''
     }
   },
 }
