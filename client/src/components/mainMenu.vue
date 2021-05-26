@@ -67,7 +67,7 @@ export default {
       return this.$store.state.user;
     },
     createSocketConnection() {
-      var socket = io.connect(`https://15.207.107.63:5000`);
+      var socket = io.connect(`http://15.207.107.63:5000`);
       this.setSocketToStore(socket);
       this.initialiseHandlers();
     },
