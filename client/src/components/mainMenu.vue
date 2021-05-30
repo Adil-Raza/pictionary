@@ -52,7 +52,10 @@ export default {
   props: [],
   watch: {},
   mounted() {},
-  created() {},
+  created() {
+    if(!localStorage.getItem('token'))
+      this.$router.push({name: 'login'});
+  },
   methods: {
     getSocketFromStore() {
       return this.$store.state.socket;
@@ -67,7 +70,7 @@ export default {
       return this.$store.state.user;
     },
     createSocketConnection() {
-      var socket = io.connect(`http://15.207.107.63:5000`);
+      var socket = io.connect(`http://65.0.93.236:5000`); //`http://localhost:5000`);//
       this.setSocketToStore(socket);
       this.initialiseHandlers();
     },

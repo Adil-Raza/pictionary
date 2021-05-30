@@ -63,6 +63,8 @@ socket messages
 - gameStarted   // server ack for startGame
 - boardChange  // when there is change in canvas
 - boardChangeBrod // broadcasting the change in canvas
+- clearCanvas // client sends when canvas is cleared
+- clearCanvasBrod // sent to all client to clear the canvas
 - chat  // to send msg
 - chatBrod  // server brodcasting msgs
 - gameRoundBrod // server sending the current round when it that round starts and someone should select the word
@@ -72,6 +74,7 @@ socket messages
 - playerGuessed // when some guesses the word
 - refereshPlayer  // when round starts and player data needs to be refereshed, like hasGuessed
 - gameEnd // when game ends
+- gotoRoom  // after 10 sec server send to go back to room as game is over
 
 
 

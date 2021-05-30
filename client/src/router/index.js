@@ -1,9 +1,10 @@
 import Vue from "vue";
 import VueRouter from "vue-router";
-import Home from "../views/Home.vue";
+// import Home from "../views/Home.vue";
 import MainMenu from "../views/mainMenu.vue";
 import Login from "../views/login.vue";
 import Room from "../views/room.vue";
+import Callback from "../views/Callback.vue";
 
 Vue.use(VueRouter);
 
@@ -11,7 +12,9 @@ const routes = [
   {
     path: "/",
     name: "home",
-    component: Home,
+    redirect: {
+      name: 'login'
+    }
   },{
     path: "/login",
     name: "login",
@@ -24,6 +27,10 @@ const routes = [
     path: "/room/:id",
     name: "room",
     component: Room,
+  },{
+    path: "/callback",
+    name: "callback",
+    component: Callback,
   },{
     path: "/about",
     name: "About",

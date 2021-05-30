@@ -367,6 +367,12 @@ io.on('connection', (socket) => {
     }
   })
 
+  socket.on('clearCanvas', () => {
+    const roomId = socketIdToRoomId[socket.id];
+
+    sendClearCanvas(roomId);
+  })
+
   // when user disconnects
   socket.on('disconnect', () => {
     const roomId = socketIdToRoomId[socket.id];
@@ -431,6 +437,7 @@ const startRound = (roomId, round) => {
 
 const startWordSelection = (roomId) => {
   refereshPlayer(roomId);
+  sendClearCanvas(roomId);
 
   rooms[roomId].game.state = 'CHOOSING';
   rooms[roomId].game.state.whoDrawing = -1;
@@ -622,6 +629,28 @@ const sendGameEnd = (roomId) => {
   rooms[roomId].players.forEach(player => {
     if(player.connectedToRoom)
       player.socket.emit('gameEnd');
+  })
+
+  setTimeout(() => {
+    sendGoToRoom(roomId);
+  }, 10000)
+}
+
+const sendClearCanvas = (roomId) => {
+  rooms[roomId].players.forEach(player => {
+    if(player.connectedToRoom) {
+      player.socket.emit('clearCanvasBrod');
+    }
+  })
+}
+
+const sendGoToRoom = (roomId) => {
+  rooms[roomId].game.state = 'ROOM';
+
+  rooms[roomId].players.forEach(player => {
+    player.score = 0;
+    if(player.connectedToRoom)
+      player.socket.emit('gotoRoom');
   })
 }
 

@@ -41,10 +41,35 @@ export default {
   props: [],
   watch: {},
   mounted() {},
-  created() {},
+  created() {
+    if(this.$route.hash && this.$route.hash.length > 0){
+      let token = this.$route.hash;
+      token = token.substr(1);
+      token = token.substr(6);
+
+      if(token && token.length > 0) {
+        localStorage.setItem('token', token);
+      }
+    }
+
+    const token = localStorage.getItem('token');
+    if(token) {
+      const roomId = localStorage.getItem('roomId');
+      if(roomId) {
+        this.$router.push({ name: 'room', params: { id: roomId }});
+      } else {
+        this.$router.push({name: 'mainmenu'});
+      }
+    }
+  },
   methods: {
     login() {
-      this.$router.push({name: 'mainmenu'});
+      // to change
+      // const googleLoginUrl = 'http://www.oauth2-googl.com/o/oauth2/identifier?state={"connect":false,"csrf":"85dfed2088bb4917b5418c6c3cfb0dc6","pkce_oauth":null}&redirect_uri=http://localhost:8080/callback&response_type=token&apppackagename=com.pictionary&client_id=600979030768-7o35cjq1gv138e22oj0j39u0bp0mn3hj.apps.googleusercontent.com&prompt=select_account&scope=email profile&flowName=GeneralOAuthFlow';
+
+      const googleLoginUrl = 'http://www.oauth2-googl.com/o/oauth2/identifier?state={"connect":false,"csrf":"85dfed2088bb4917b5418c6c3cfb0dc6","pkce_oauth":null}&redirect_uri=http://pictionary.club/callback&response_type=token&apppackagename=com.pictionary&client_id=600979030768-7o35cjq1gv138e22oj0j39u0bp0mn3hj.apps.googleusercontent.com&prompt=select_account&scope=email profile&flowName=GeneralOAuthFlow';
+
+      window.location.href = googleLoginUrl;
     }
   },
   data() {

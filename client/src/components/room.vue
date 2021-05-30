@@ -13,6 +13,7 @@
                   <h3 class="card-title" style="color: aliceblue;">
                     💣😾  𝐏เᑕ𝕋ⓘｏηคгу  💜👊
                   </h3>
+                  <h3 class="cart-text" style="color: #ababab; letter-spacing: 10px;">{{currentWord}}</h3>
                 </b-col>
                 <b-col style="text-align:right; color: #ababab; margin-top: 20px; padding-right: 150px">
                   <h4>Time left {{timer}} sec</h4>
@@ -127,6 +128,11 @@
     </span>
     <span v-else>
       <span v-if="connectedToRoom" style="position: relative">
+        <!-- <b-row>
+          <b-col>
+
+          </b-col>
+        </b-row> -->
         <b-row style="width: 70rem; padding: 30px; position: absolute; left: 50%; top: 50%; transform: translate(-50%, 10%);">
           <b-col style="height: 400px">
             <div>
@@ -252,21 +258,31 @@ export default {
   watch: {},
   mounted() {},
   created() {
-    let newUser = false;
 
-    this.socket = this.getSocketFromStore();
-    if(this.socket === null) {
-      this.createSocketConnection();
-      newUser = true;
-    }
-
-    this.initializeHandlers();
-    // initialize handlers
-      // connectedToRoom
-
-    if(!newUser) {
+    if(!localStorage.getItem('token')) {
       const roomId = this.$route.params.id;
-      this.connectToRoom(roomId);
+      localStorage('roomId', roomId);
+
+      this.$router.push({name: 'login'});
+    } else {
+      localStorage.removeItem('roomId');
+
+      let newUser = false;
+
+      this.socket = this.getSocketFromStore();
+      if(this.socket === null) {
+        this.createSocketConnection();
+        newUser = true;
+      }
+
+      this.initializeHandlers();
+      // initialize handlers
+        // connectedToRoom
+
+      if(!newUser) {
+        const roomId = this.$route.params.id;
+        this.connectToRoom(roomId);
+      }
     }
   },
   methods: {
@@ -286,7 +302,7 @@ export default {
       return this.$store.state.user;
     },
     createSocketConnection() {
-      this.socket = io.connect(`http://15.207.107.63:5000`);
+      this.socket = io.connect(`http://65.0.93.236:5000`); //`http://localhost:5000`);//
       this.setSocketToStore(this.socket);
     },
     initializeHandlers() {
@@ -305,6 +321,8 @@ export default {
       this.socket.on('playerGuessed', this.handlePlayerGuessed)
       this.socket.on('refereshPlayer', this.handleRefereshPlayer)
       this.socket.on('gameEnd', this.handleGameEnd)
+      this.socket.on('clearCanvasBrod', this.handleclearCanvasBrod)
+      this.socket.on('gotoRoom', this.handleGotoRoom)
 
     },
     handleConnectedToRoom(response) {
@@ -394,6 +412,7 @@ export default {
       this.game.state = data.state;
       this.game.currentRound = data.currentRound;
       this.game.whoDrawing = data.whoDrawing;
+      this.currentWord = data.currentWord;
 
       this.timer = this.game.timeoutSec;
 
@@ -407,7 +426,8 @@ export default {
       this.game.state = data.game.state;
 
       if(this.game.state === 'TIMEOUT') {
-         this.subRoundScores = data.scores;
+        this.currentWord = '';
+        this.subRoundScores = data.scores;
         this.word = data.word;
 
         this.users.forEach(user => {
@@ -441,6 +461,22 @@ export default {
     },
     handleGameEnd() {
       this.game.state = 'GAMEEND';
+    },
+    handleclearCanvasBrod() {
+      this.canvas.clearRect(0, 0, this.canvasSize.width, this.canvasSize.height);
+    },
+    handleGotoRoom() {
+      this.setDefaults();
+
+      this.users.forEach((user) => {
+        user.score = 0;
+      })
+    },
+    setDefaults() {
+      this.gameStarted = false;
+      this.game = undefined;
+      this.subRoundScores = {}
+      this.isDrawing = false;
     },
     connectToRoom(roomId) {
       this.socket.emit('connectToRoom', { roomId, user: this.getUserFromStore() });
@@ -545,6 +581,8 @@ export default {
       }
     },
     beginDrawing(e) {
+      if(!this.isMeDrawing()) return;
+
       if(this.canvasSelectedTool === 'PEN' || this.canvasSelectedTool === 'ERASER') {
         this.x = e.offsetX;
         this.y = e.offsetY;
@@ -559,6 +597,8 @@ export default {
       }
     },
     stopDrawing(e) {
+      if(!this.isMeDrawing()) return;
+
       if (this.isDrawing) {
         let color = this.colorSelected ? this.colorSelected : 'black';
 
@@ -572,13 +612,16 @@ export default {
         if(this.boardSendingInterval){
           clearInterval(this.boardSendingInterval);
         }
+
         this.sendCanvasToServer();
       }
     },
     clearCanvas() {
-      this.canvas.clearRect(0, 0, this.canvasSize.width, this.canvasSize.height);
+      //this.canvas.clearRect(0, 0, this.canvasSize.width, this.canvasSize.height);
 
-      this.sendCanvasToServer();
+      //this.sendCanvasToServer();
+
+      this.socket.emit('clearCanvas');
     },
     fillColor(color) {
       this.canvas.fillStyle = color;
@@ -638,7 +681,7 @@ export default {
     getSortedUsers() {
       let result = [...this.users];
 
-      result.sort((a, b) => (a.score > b.score) ? 1 : ((b.score > a.score) ? -1 : 0));
+      result.sort((a, b) => (a.score < b.score) ? 1 : ((b.score < a.score) ? -1 : 0));
 
       return result;
     }
@@ -704,7 +747,8 @@ export default {
       timerInterval: undefined,
       timer : 0,
       subRoundScores: {},
-      word: ''
+      word: '', // this is to show in label when round ends
+      currentWord: '' // this is to show when game is on, and what is the selected word
     }
   },
 }
